@@ -58,5 +58,5 @@ send-test:
 ifndef TO
 	$(error usage: make send-test TO=you@recipient.example)
 endif
-	@( sleep 2; printf 'EHLO maketest\r\n'; sleep 1; printf 'MAIL FROM:<$(FROM)>\r\n'; sleep 1; printf 'RCPT TO:<$(TO)>\r\n'; sleep 1; printf 'DATA\r\n'; sleep 1; printf 'Subject: smtp-relay make test\r\n\r\nSent via smtp-relay (make send-test).\r\n.\r\n'; sleep 1; printf 'QUIT\r\n' ) | nc -w 15 127.0.0.1 $(SMTP_PORT)
+	@( sleep 2; printf 'EHLO maketest\r\n'; sleep 1; printf 'MAIL FROM:<$(FROM)>\r\n'; sleep 1; printf 'RCPT TO:<$(TO)>\r\n'; sleep 1; printf 'DATA\r\n'; sleep 1; printf 'From: $(FROM)\r\nTo: $(TO)\r\nSubject: smtp-relay make test\r\n\r\nSent via smtp-relay (make send-test).\r\n.\r\n'; sleep 1; printf 'QUIT\r\n' ) | nc -w 15 127.0.0.1 $(SMTP_PORT)
 	@echo "Handed to relay on 127.0.0.1:$(SMTP_PORT) - check the inbox / 'make logs'"
