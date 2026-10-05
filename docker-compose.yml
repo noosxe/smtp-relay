@@ -40,7 +40,11 @@ services:
       # set BIND_IP=127.0.0.1 in .env for localhost-only.
       - "${BIND_IP:-0.0.0.0}:${SMTP_PORT:-25}:25"
     healthcheck:
-      test: ["CMD-SHELL", "printf 'EHLO healthcheck\\r\\n' | timeout 5 nc 127.0.0.1 25 | grep -q '^220'"]
+      # Read the SMTP banner passively (220 greeting), then QUIT. Never send
+      # EHLO before the greeting: Postfix answers premature input with
+      # "554 SMTP protocol synchronization", which failed this probe while
+      # Postfix itself was perfectly healthy.
+      test: ["CMD-SHELL", "(sleep 2; printf 'QUIT\\r\\n') | timeout 5 nc 127.0.0.1 25 | grep -q '^220'"]
       interval: 30s
       timeout: 6s
       retries: 3
