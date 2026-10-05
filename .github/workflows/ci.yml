@@ -83,6 +83,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          # Lint the PR branch itself, not the synthetic merge ref GitHub
+          # creates for pull_request events (its "Merge X into Y" commit is
+          # auto-generated and never conventional).
+          ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
 
       - name: PR title and commit subjects follow conventional commits
@@ -99,7 +103,14 @@ jobs:
           echo "PR title OK: $PR_TITLE"
 
           git fetch origin main --quiet
-          git log --format=%s origin/main..HEAD | while IFS= read -r subject; do
+          merges=$(git log --merges --format=%s origin/main..HEAD)
+          if [ -n "$merges" ]; then
+            echo "::error::merge commits are not allowed in PR branches (AGENTS.md: rebase onto latest main)"
+            printf '%s\n' "$merges" | sed 's/^/  - /'
+            exit 1
+          fi
+
+          git log --no-merges --format=%s origin/main..HEAD | while IFS= read -r subject; do
             printf '%s\n' "$subject" | grep -qE "$pat" || {
               echo "::error::commit subject is not conventional: '$subject'"
               exit 1
