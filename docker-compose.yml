@@ -1,0 +1,55 @@
+name: smtp-relay
+
+services:
+  smtp-relay:
+    image: ${IMAGE:-boky/postfix:latest}
+    container_name: ${CONTAINER_NAME:-smtp-relay}
+    restart: ${RESTART_POLICY:-unless-stopped}
+    environment:
+      # --- Upstream (provider) relay ---
+      # host:port of the SMTP provider you relay through
+      RELAYHOST: ${RELAYHOST:-smtp.resend.com:587}
+      RELAYHOST_USERNAME: ${RELAYHOST_USERNAME:-resend}
+      # Required: provider password / API key (fail fast if missing)
+      RELAYHOST_PASSWORD: ${RELAYHOST_PASSWORD:?RELAYHOST_PASSWORD is required - copy .env.example to .env and set it}
+
+      # --- Who may relay without authenticating ---
+      # Must cover host-originated traffic (docker bridge gateway, e.g. 172.x.0.1),
+      # other docker networks and any LAN hosts you want to serve.
+      MYNETWORKS: ${MYNETWORKS:-127.0.0.0/8,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16}
+
+      # --- Identity ---
+      # Domain appended to bare addresses (root -> root@$MYORIGIN)
+      POSTFIX_myorigin: ${MYORIGIN:-localhost.localdomain}
+      # Hostname used in HELO/EHLO and Received headers
+      POSTFIX_myhostname: ${MYHOSTNAME:-smtp-relay.local}
+
+      # --- Outbound TLS ---
+      # Force STARTTLS on the upstream connection
+      POSTFIX_smtp_tls_security_level: ${SMTP_TLS_SECURITY_LEVEL:-encrypt}
+      # Generate self-signed cert and enable TLS on the inbound side too
+      USE_TLS: ${USE_TLS:-yes}
+    ports:
+      # Published on the host itself: host services/scripts use <BIND_IP>:<SMTP_PORT>.
+      # 0.0.0.0 = reachable from LAN as well (relay access is still gated by MYNETWORKS);
+      # set BIND_IP=127.0.0.1 in .env for localhost-only.
+      - "${BIND_IP:-0.0.0.0}:${SMTP_PORT:-25}:25"
+    healthcheck:
+      test: ["CMD-SHELL", "printf 'EHLO healthcheck\\r\\n' | timeout 5 nc 127.0.0.1 25 | grep -q '^220'"]
+      interval: 30s
+      timeout: 6s
+      retries: 3
+      start_period: 15s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - default
+
+# Compose-managed network, portable on any machine.
+# Other containers on this network can relay via "smtp-relay:25".
+networks:
+  default:
+    name: ${NETWORK_NAME:-smtp-relay-net}

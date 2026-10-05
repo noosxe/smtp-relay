@@ -1,0 +1,10 @@
+# secrets - never commit
+.env
+
+# local overrides
+# local overrides
+docker-compose.override.yml
+compose.override.yaml
+
+# pi agent local data (sessions, settings)
+.pi/
