@@ -1,0 +1,108 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  compose:
+    name: compose config
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: defaults resolve without .env
+        run: |
+          RELAYHOST_PASSWORD=ci-dummy docker compose -f docker-compose.yml config --quiet
+          echo "compose config OK (baked-in defaults only)"
+
+      - name: .env.example template loads and resolves
+        run: |
+          cp .env.example .env
+          RELAYHOST_PASSWORD=ci-dummy docker compose -f docker-compose.yml config --quiet
+          echo "compose config OK (from .env.example template)"
+
+      - name: missing/empty RELAYHOST_PASSWORD fails fast
+        run: |
+          # .env from the previous step has an empty value; ${VAR:?} must reject it
+          if docker compose -f docker-compose.yml config --quiet 2>/dev/null; then
+            echo "::error::expected failure with RELAYHOST_PASSWORD unset/empty, but config succeeded"
+            exit 1
+          fi
+          echo "fail-fast guard works"
+
+  makefile:
+    name: make targets
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: all targets dry-run clean
+        run: |
+          make -n launch stop restart pull logs status
+          make -n send-test TO=ci@example.com > /dev/null
+          echo "make dry-runs OK"
+
+      - name: send-test requires TO
+        run: |
+          if make send-test > /dev/null 2>&1; then
+            echo "::error::'make send-test' should fail without TO, but it succeeded"
+            exit 1
+          fi
+          echo "TO guard works"
+
+  secrets:
+    name: secret scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: scan tracked files for credential patterns
+        run: |
+          set -o pipefail
+          if git grep -InE \
+            '(re|rk)_[A-Za-z0-9]{16,}|sk-[A-Za-z0-9]{20,}|ghp_[A-Za-z0-9]{30,}|gho_[A-Za-z0-9]{30,}|xox[baprs]-[A-Za-z0-9-]{10,}|AKIA[0-9A-Z]{16}|BEGIN (RSA|EC|OPENSSH|DSA|PGP) PRIVATE KEY|Bearer [A-Za-z0-9._~+/-]{30,}' \
+            -- . ; then
+            echo "::error::credential-like pattern found (see matches above)"
+            exit 1
+          fi
+          echo "no credential-like patterns found"
+
+  commits:
+    name: conventional commits
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: PR title and commit subjects follow conventional commits
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          set -euo pipefail
+          pat='^(build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test)(\([a-z0-9._/-]+\))?!?: .{1,72}$'
+
+          printf '%s\n' "$PR_TITLE" | grep -qE "$pat" || {
+            echo "::error::PR title must be 'type(scope): subject' (feat|fix|docs|chore|refactor|test|ci|style|perf|build|revert)"
+            exit 1
+          }
+          echo "PR title OK: $PR_TITLE"
+
+          git fetch origin main --quiet
+          git log --format=%s origin/main..HEAD | while IFS= read -r subject; do
+            printf '%s\n' "$subject" | grep -qE "$pat" || {
+              echo "::error::commit subject is not conventional: '$subject'"
+              exit 1
+            }
+            echo "commit OK: $subject"
+          done
