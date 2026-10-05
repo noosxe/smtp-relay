@@ -1,0 +1,18 @@
+# Dependabot: keep the GitHub Actions in our workflows up to date.
+# All updates are grouped into a single weekly PR (patterns: "*") —
+# no PR-per-action spam.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    # One grouped PR for all ecosystem updates
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+    # Conventional-commit subject so the CI commit-lint job accepts it
+    commit-message:
+      prefix: "ci"
