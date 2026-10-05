@@ -17,7 +17,7 @@ jobs:
     name: compose config
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: defaults resolve without .env
         run: |
@@ -43,7 +43,7 @@ jobs:
     name: make targets
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: all targets dry-run clean
         run: |
@@ -63,7 +63,7 @@ jobs:
     name: secret scan
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: scan tracked files for credential patterns
         run: |
@@ -81,7 +81,7 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           # Lint the PR branch itself, not the synthetic merge ref GitHub
           # creates for pull_request events (its "Merge X into Y" commit is
