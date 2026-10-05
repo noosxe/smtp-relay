@@ -82,6 +82,9 @@ and typical LANs. Tighten or extend it in `.env` to match your deployment.
 
 - **Port 25 conflict**: if the host already runs an MTA (postfix/exim/sendmail), either stop it
   or set `SMTP_PORT` in `.env` to another port.
+- **Crash loop with "You need to specify ALLOWED_SENDER_DOMAINS"**: the image requires an
+  explicit sender-domain policy before it will run. It defaults to `MYORIGIN`; set
+  `ALLOWED_SENDER_DOMAINS` in `.env` (space-separated list) to accept more sender domains.
 - **Upstream TLS**: `SMTP_TLS_SECURITY_LEVEL=encrypt` refuses to deliver unless the upstream
   connection uses STARTTLS.
 - **Bare addresses**: envelopes like `MAIL FROM:<root>` are completed to `root@MYORIGIN`
